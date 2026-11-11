@@ -4,7 +4,7 @@ description: Plan a build before coding. Grills the user one question at a time 
 license: MIT
 metadata:
   companion-skill: next-slice
-  version: "1.6.0"
+  version: "1.7.0"
 ---
 
 # The Right Way
@@ -22,7 +22,8 @@ Core rule: **everything a future chat needs lives in files, never in this conver
 2. Explore the codebase so you never ask what the code already answers. Keep it cheap:
    - If you can launch a subagent, delegate the exploration and ask for a summary of 30 lines or fewer: stack, layout, conventions, test and build commands, and anything relevant to the goal.
    - Otherwise list the tree and skim manifests, README, and CI config. Read only the parts you need; do not read whole source files to "get oriented".
-3. In the same turn as your first question, create `build-plan/<slug>/SPEC.md` from [the spec template](templates/SPEC.md) with the goal and your open questions.
+3. Run the project's checks once for a baseline, so pre-existing failures and untestable outcomes surface now, not in the last slice. Run the test, typecheck, lint, and build commands you found, with quiet reporters; fix nothing. Then note what this environment cannot do that the goal needs: a different database from production, empty or missing seed data, unavailable services or keys, no browser. A subagent exploring for you can do this too: ask for one line per check (`passes`, `fails: what`, or `not configured`) plus the limits.
+4. In the same turn as your first question, create `build-plan/<slug>/SPEC.md` from [the spec template](templates/SPEC.md) with the goal, your open questions, and the baseline under **Stack and constraints** (a **Checks at plan time** line and an **Environment limits** line). A limit that blocks verifying the goal is an open question.
 
 ## Phase 1: Grill
 
@@ -82,7 +83,7 @@ A slice is a unit of work a **fresh agent with zero chat history** can complete,
 1. **Vertical over horizontal.** Thin end-to-end slices beat layers. Slice 01 is usually the foundation: scaffold, tooling, core data model, a passing smoke test.
 2. **One testable outcome per slice.**
 3. **Budget**: about half a context window, leaving room to debug. Roughly 8 or fewer files touched, 5 or fewer existing files to read, a one-page brief, one or two verify commands. Over budget means split.
-4. **Runnable, automated checks.** Every **Verify** command runs without a human: tests, typecheck, lint, build, or a `curl` smoke test. Use the check commands the project already has (found in Phase 0). If the plan needs a check the project lacks, slice 01 sets it up and the user agrees to it; never list an unconfigured check. Only ask for a manual browser check when an outcome is purely visual, and say exactly what to look at. An end-to-end browser walkthrough spanning several features goes once in the **Verify** of the last slice that completes them, not in each slice.
+4. **Runnable, automated checks that this environment can run.** Every **Verify** command runs without a human: tests, typecheck, lint, build, or a `curl` smoke test. Use the check commands the project already has (found in Phase 0). If the plan needs a check the project lacks, slice 01 sets it up and the user agrees to it; never list an unconfigured check. Hold every criterion against the Phase 0 limits: if the environment cannot exercise it (a query that only runs on the production database, a page that needs data the sandbox lacks), plan a check that can run (a unit test of the query, fixture data in slice 01) or mark the criterion `needs <environment>` and say so when you show the slice list. Only ask for a manual browser check when an outcome is purely visual and the environment can render it, and say exactly what to look at. An end-to-end browser walkthrough spanning several features goes once in the **Verify** of the last slice that completes them, not in each slice.
 5. **Contracts, not memories.** Slices connect only through exact contracts in their briefs: paths, signatures, types, routes, tables, flags, events. Never "as discussed".
 6. **Explicit dependencies.** List them; mark slices with no dependency between them as parallel-safe.
 7. **3 to 12 slices** is typical. More than 12: group under milestones. Fewer than 3: say the build may not need this skill.
@@ -107,8 +108,9 @@ Every future chat reads these files, so every line costs tokens in every build c
 - In briefs, **cite** requirement and decision IDs (`R-02`, `D-004`) instead of copying spec text. The exception is contracts: **Consumes** and **Produces** must be complete enough to code against without opening another file.
 - **Read first** lists only what the builder truly needs. It is the main lever on future chat size.
 - **Handoff** stays empty for the builder.
+- Write acceptance criteria and **Verify** as you mean them: builders may not loosen them without the user.
 
-Set every slice to `todo` in `PROGRESS.md` with **Next up** pointing at slice 01. If the project has `AGENTS.md` or `CLAUDE.md`, offer to add one line pointing at `build-plan/`.
+Set every slice to `todo` in `PROGRESS.md` with **Next up** pointing at slice 01. Copy the Phase 0 baseline and environment limits into its **Environment** section, one line each; builders keep it current. If the project has `AGENTS.md` or `CLAUDE.md`, offer to add one line pointing at `build-plan/`.
 
 ## Phase 4: Hand off
 

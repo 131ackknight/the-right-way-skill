@@ -2,7 +2,7 @@
 
 **Grill the plan until it's airtight. Then build it one fresh chat at a time.**
 
-[![Validate](https://github.com/131ackknight/the-right-way/actions/workflows/validate.yml/badge.svg)](https://github.com/131ackknight/the-right-way/actions/workflows/validate.yml)
+[![Validate](https://github.com/131ackknight/the-right-way-skill/actions/workflows/validate.yml/badge.svg)](https://github.com/131ackknight/the-right-way-skill/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Works with Claude Code, Cursor, Codex](https://img.shields.io/badge/works%20with-Claude%20Code%20%7C%20Cursor%20%7C%20Codex-8A2BE2)
 
@@ -35,6 +35,7 @@ flowchart LR
 ### 1. `the-right-way`: grill, slice, write the build pack
 
 - **Grills one question at a time**, always with a recommended answer, so you can reply "yes" and move on. It reads your codebase first, so it never asks what the code already answers.
+- **Runs your checks once before planning.** Pre-existing test failures and what the environment can't test (a different database from production, missing data, no browser) come out at the start, not in the last slice. Every **Verify** step is one the build environment can actually run.
 - **Logs every decision** (`D-001`, `D-002`, ...), with the reason and whether you decided it or said "your call". It writes them to disk in batched checkpoints rather than after every answer, so the gap between questions stays short and the planning chat doesn't fill up with file edits. The planning chat can itself be resumed in a new chat if it runs long.
 - **Slices the work** into vertical, independently verifiable units with a context budget: roughly 8 files touched or fewer, about 5 files to read, one testable outcome.
 - **Connects slices through contracts, not memories.** Each brief spells out the exact signatures, routes, and types it **consumes** and **produces**. A brief can never say "as discussed".
@@ -44,10 +45,12 @@ flowchart LR
 
 - Builds the slice the kickoff prompt names, or the next ready one. It claims the slice in `PROGRESS.md` and never takes over a slice another chat is working on. It loads **only** that brief plus the files it lists.
 - Checks the consumed contracts exist on disk before writing a line of code.
-- Builds, then runs the slice's verify commands. It never marks a slice done with failing checks.
+- Builds, then runs the slice's verify commands. It never marks a slice done with failing checks, and never loosens a check to pass it: acceptance criteria change only with your OK. A check the environment can't run is marked unverified, never ticked.
+- Records environment and setup gotchas once, in `PROGRESS.md`, so later chats don't rediscover them.
 - Writes a **handoff**: what changed, deviations, and changed contracts. It then updates the briefs of any downstream slices so the next chat codes against reality.
 - **Splits instead of sprawling.** If a slice grows past its budget, it stops at a clean point and writes the remaining work as new slices.
 - Prints a kickoff prompt for each slice that is ready now, so parallel chats each get their own.
+- **Closes out the pack** in one last chat: runs every check once against the plan-time baseline, ticks the spec's acceptance criteria, triages discovered work with you, and lists exactly what you still need to check by hand.
 
 ## The build pack
 
@@ -55,7 +58,7 @@ flowchart LR
 build-plan/
   streaks/             # one folder per planned effort
     SPEC.md            # requirements with acceptance criteria, data model, decisions log
-    PROGRESS.md        # slice table: status, dependencies, parallel-safe pairs. The source of truth.
+    PROGRESS.md        # slice table, environment notes, discovered work. The source of truth.
     slices/
       01-foundation.md
       02-manage-habits.md
@@ -82,15 +85,15 @@ The [example README](examples/habit-tracker/README.md) includes an excerpt of th
 ### Claude Code (plugin)
 
 ```
-/plugin marketplace add 131ackknight/the-right-way
+/plugin marketplace add 131ackknight/the-right-way-skill
 /plugin install the-right-way@the-right-way
 ```
 
 ### Any tool (script)
 
 ```bash
-git clone https://github.com/131ackknight/the-right-way.git
-cd the-right-way
+git clone https://github.com/131ackknight/the-right-way-skill.git
+cd the-right-way-skill
 ./scripts/install.sh            # auto-detects Claude Code, Cursor, and Codex
 ./scripts/install.sh --all      # or install for all three
 ./scripts/install.sh --cursor --project   # into the current project only
@@ -125,6 +128,12 @@ Use the next-slice skill to build slice 01 of build-plan/habit-tracker/.
 
 Each finished slice prints the next prompt. When two slices can run in parallel, you get one prompt per slice: paste each into its own chat. With several efforts in one repo, the folder in the prompt keeps them apart. If you leave out the slice number, the agent picks the next ready slice; if you leave out the folder and there are several, it asks which one.
 
+**Close out** (in a new chat, once every slice is done). The last slice prints this prompt:
+
+```
+Use the next-slice skill to close out build-plan/habit-tracker/.
+```
+
 ## Design principles
 
 1. **Files over memory.** If a decision isn't written down, it didn't happen.
@@ -132,7 +141,7 @@ Each finished slice prints the next prompt. When two slices can run in parallel,
 3. **Contracts over context.** Slices share exact interfaces, not conversation history.
 4. **Budget every chat.** A slice must fit in about half a context window, which leaves room to debug.
 5. **Split, don't sprawl.** Running over budget produces new slices, not a longer chat.
-6. **Verify before done.** Every slice ships with commands that prove it works.
+6. **Verify before done.** Every slice ships with commands that prove it works in the environment it is built in. Checks are fixed before building; a builder never loosens one to pass it.
 7. **Every line is read many times.** Skill descriptions stay short because they load into every chat. Templates carry no boilerplate. Briefs cite spec IDs instead of copying text. Builders batch their reads, run each check once with quiet output, and do their bookkeeping in a few combined edits.
 
 ## Repository layout

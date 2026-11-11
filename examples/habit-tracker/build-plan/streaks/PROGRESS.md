@@ -24,6 +24,11 @@ Use the next-slice skill to build slice 04 of build-plan/streaks/.
 | 04 | History heatmap | todo | 02 | 03 | [04](slices/04-history-heatmap.md) |
 | 05 | Export and import | todo | 03 | none | [05](slices/05-export-import.md) |
 
+## Environment
+
+- Checks at plan time: no project yet; slice 01 sets up `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build`.
+- No browser in the build chats. UI outcomes are checked with Testing Library, not by hand.
+
 ## Discovered work
 
 - Archived habits cannot be viewed or restored (found in slice 02). Not required by R-01; candidate for a future slice. Tracked as a non-blocking open question in SPEC.md.

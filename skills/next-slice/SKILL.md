@@ -1,10 +1,10 @@
 ---
 name: next-slice
-description: Build exactly one slice of a build pack made by the-right-way, in a fresh chat. Loads only that slice's brief, builds and verifies it, writes a handoff, and updates PROGRESS.md for the next chat. Use for "next slice", "build slice NN", or a build-plan/ folder.
+description: Build exactly one slice of a build pack made by the-right-way, in a fresh chat. Loads only that slice's brief, builds and verifies it, writes a handoff, and updates PROGRESS.md for the next chat. Use for "next slice", "build slice NN", "close out" a pack, or a build-plan/ folder.
 license: MIT
 metadata:
   companion-skill: the-right-way
-  version: "1.6.0"
+  version: "1.7.0"
 ---
 
 # Next Slice
@@ -24,9 +24,11 @@ Find the pack. Kickoff prompts name it, for example `build slice 03 of build-pla
 - If not, list `build-plan/`. One pack: use it. Several: show each pack with its **Next up** and ask which one; never guess. None: tell the user to plan with `the-right-way` first.
 - Older packs may sit directly in `build-plan/` (with `build-plan/PROGRESS.md`); treat that folder as the pack.
 
-Open the pack's `PROGRESS.md`. You only need **Next up** and the **Slices** table.
+If the prompt asks to close out the pack, go to **Closing out the pack** at the end of this file.
 
-Status values: `todo`, `doing (date)`, `done (date)`, `blocked: reason`, `split into NNa, NNb`.
+Open the pack's `PROGRESS.md`. You only need **Next up**, the **Slices** table, and **Environment**.
+
+Status values: `todo`, `doing (date)`, `done (date)`, `done (date, unverified: R-NN)`, `blocked: reason`, `split into NNa, NNb`.
 
 1. If the prompt names a slice, build that one, once its dependencies are `done`. If it is already `doing`, ask whether another chat is still on it before touching it; if the user says it was interrupted, resume it (see the end of this file).
 2. If no slice is named, take the lowest-numbered `todo` slice whose dependencies are all `done`. Never take over a `doing` slice unprompted: it may be another chat working right now. Mention any `doing` slices in your report so the user can say if one was interrupted.
@@ -65,11 +67,13 @@ Confirm the **Consumes** items exist with the stated shape using one combined se
 
 ## Step 5: Verify
 
+- **Acceptance criteria and Verify are fixed.** Never edit, drop, or loosen one so it passes, and never swap a **Verify** command for a weaker one. If one is wrong or cannot be met, ask the user; with their OK, change it and log a decision.
 - Run each check once: the **Verify** commands, plus the project's typecheck and lint only if they already work. Do not run the test suite a second time if **Verify** already runs it.
 - Keep the output small: use quiet or summary reporters (for example `vitest run --reporter=dot`, `pytest -q`, `npm run build --silent`). Only print full output for what failed, and re-run just the failing test while fixing it.
 - Check an acceptance box only when it is actually true. Never mark a slice `done` with failing checks it caused. If it cannot pass within budget, split.
-- **Pre-existing failures:** if a check fails in code this slice did not touch, confirm it is unrelated (it fails without your changes, or clearly concerns other code). Do not fix it. Log it in **Discovered work** and the Handoff, and the slice can still be `done`. If it blocks your own **Verify** commands, set the slice to `blocked` instead.
+- **Pre-existing failures:** a failure already listed in **Environment** needs no investigation. For a new one in code this slice did not touch, confirm it is unrelated (it fails without your changes, or clearly concerns other code). Do not fix it. Log it in **Discovered work** and the Handoff, and the slice can still be `done`. If it blocks your own **Verify** commands, set the slice to `blocked` instead.
 - **Missing tooling:** if one of the brief's own **Verify** commands cannot run because setup is missing, add the minimal setup and record it as a deviation. If an extra project check (lint, typecheck) that **Verify** does not list is broken or unconfigured, skip it and note it in **Discovered work**. Never add project-wide config for a check the brief did not ask for.
+- **Checks the environment cannot run:** if a criterion or **Verify** step cannot be exercised here (for example a Postgres-only query on a sqlite sandbox, or a page that needs data the sandbox lacks), never tick it or call it verified. Leave the box unticked with `(unverified: reason)` and add the limit to **Environment** if it is new. When everything else passes, set the slice to `done (YYYY-MM-DD, unverified: R-NN)`.
 - **No manual browser passes** unless this slice's **Verify** explicitly asks for one. A spec-level requirement for a browser pass belongs to the slice that lists it, usually the last one, not to every slice. Driving a browser costs many round trips and large screenshots. Prefer the brief's automated checks; for a quick smoke test of a page, fetch it with `curl` and check the status and key text.
 
 ## Step 6: Hand off
@@ -81,15 +85,15 @@ Do this in as few edits as possible: one to the brief, one to `PROGRESS.md`, and
    - **What changed:** the files, as one list.
    - **Deviations from this brief:** what differs and why.
    - **New or changed contracts:** exact signatures, paths, or shapes that differ from **Produces**.
-   - **Notes for downstream slices:** gotchas only.
+   - **Notes for downstream slices:** gotchas only, 5 bullets at most. Environment and setup gotchas (generate steps, services, sandbox limits) go in **Environment** in `PROGRESS.md` instead, so later chats read them once.
 2. If a contract changed, edit the **Consumes** lines of each downstream brief that uses it. Find those briefs via the **Depends on** column. Touch only those lines.
-3. In `PROGRESS.md`, in one edit: set the slice to `done (YYYY-MM-DD)`, point **Next up** at the next ready slice, add any **Discovered work**, and add one line to **Log**.
+3. In `PROGRESS.md`, in one edit: set the slice to `done (YYYY-MM-DD)`, point **Next up** at the next ready slice, add any **Discovered work** and new **Environment** lines, and add one line to **Log**.
 4. Append any new decisions to the `SPEC.md` decisions log as `D-NNN (slice NN)`.
 
 ## Step 7: Commit and stop
 
 - If the project uses git, commit the code and build-pack updates together as `slice NN: title`, unless the repo has its own conventions.
-- Report in a few lines: what was built, how it was verified, and any deviations or discovered work. Name any parallel-safe slices that can start now. If every slice is `done`, summarize and suggest a final review against `SPEC.md`.
+- Report in a few lines: what was built, how it was verified, and any deviations or discovered work. Name any parallel-safe slices that can start now. If every slice is now `done`, point **Next up** at the closeout and end with its kickoff prompt instead: `Use the next-slice skill to close out build-plan/<slug>/.`
 - End with kickoff prompts naming the exact slice and pack, one code block per slice that is ready now (one per parallel chat), then stop:
 
 ```
@@ -99,3 +103,14 @@ Use the next-slice skill to build slice 04 of build-plan/<slug>/.
 ## Resuming an interrupted slice
 
 Only when the user confirms the slice was interrupted: run `git status` and `git diff --stat` (not the full diff) and read any partial Handoff. Then continue from the first incomplete task without redoing finished work.
+
+## Closing out the pack
+
+Run this in a fresh chat once every slice is `done`. It is the final review.
+
+1. In one parallel batch, read `PROGRESS.md`, the **Requirements** section of `SPEC.md`, and from each brief only its **Acceptance criteria** and **Handoff**.
+2. Run the full check suite once, quietly: every distinct **Verify** command across the slices, plus the project checks in **Environment**. Compare failures with the plan-time baseline. A failure that is not in the baseline is a regression: report it and do not close the pack.
+3. In one edit to `SPEC.md`, tick each requirement criterion that a ticked slice box or a passing check proves. Leave the rest unticked with `(unverified: reason)`.
+4. Triage each **Discovered work** item with the user (through the question tool if you have one, up to 4 items per call): plan it as a new pack with `the-right-way`, fix it now if it is a few lines and the user agrees, or drop it. Note each outcome beside the item.
+5. In one edit to `PROGRESS.md`, set **Next up** to `Closed (YYYY-MM-DD)` and add a **Log** line.
+6. Commit as `close out <slug>`. Report what was built, the triage results, and every criterion still unverified with exactly what the user must check by hand and where (staging, production, a device).
